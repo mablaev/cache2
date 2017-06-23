@@ -100,6 +100,19 @@ public class CacheMapTest extends TestCase {
         assertNull(cache.remove(new Integer(1)));
     }
 
+    public void testReplace() throws Exception {
+        cache.put(1, "apple");
+        cache.put(2, "orange");
+
+        Clock.setTime(TM_500_AFTER_START);
+
+        cache.put(1, "orange");
+
+        Clock.setTime(TM_1300_AFTER_START);
+
+        assertEquals(1, cache.size());
+    }
+
     public void testContainsKeyAndContainsValueNonExpired() {
 
         assertFalse(cache.containsKey(1));

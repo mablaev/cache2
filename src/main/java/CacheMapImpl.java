@@ -1,5 +1,6 @@
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 
@@ -8,7 +9,7 @@ public class CacheMapImpl<K, V> implements CacheMap<K, V> {
 
     private long timeToLive = DEFAULT_TIME_TO_LIVE;
 
-    private final Map<K, TimedValue<V>> storage = new HashMap<>();
+    private final Map<K, TimedValue<V>> storage = new LinkedHashMap<>();
 
     @Override
     public void setTimeToLive(long timeToLive) {
@@ -22,8 +23,7 @@ public class CacheMapImpl<K, V> implements CacheMap<K, V> {
 
     @Override
     public V put(K key, V value) {
-        TimedValue<V> newValue = new TimedValue<>(value, Clock.getTime());
-        TimedValue<V> oldValue = storage.put(key, newValue);
+        TimedValue<V> oldValue = storage.remove(key);
 
         V result = null;
 
@@ -31,12 +31,23 @@ public class CacheMapImpl<K, V> implements CacheMap<K, V> {
             result = oldValue.getValue();
         }
 
+        TimedValue<V> newValue = new TimedValue<>(value, Clock.getTime());
+        storage.put(key, newValue);
+
         return result;
     }
 
     @Override
     public void clearExpired() {
-        storage.entrySet().removeIf(entry -> !actual(entry.getValue()));
+        Iterator<TimedValue<V>> it = storage.values().iterator();
+
+        while (it.hasNext()) {
+            if (actual(it.next())) {
+                break;
+            } else {
+                it.remove();
+            }
+        }
     }
 
     @Override
@@ -101,25 +112,7 @@ public class CacheMapImpl<K, V> implements CacheMap<K, V> {
 
     @Override
     public boolean isEmpty() {
-
-        Iterator<Map.Entry<K, TimedValue<V>>> it = storage.entrySet().iterator();
-
-        boolean result = true;
-
-        while (it.hasNext()) {
-            Map.Entry<K, TimedValue<V>> entry = it.next();
-
-            TimedValue<V> tmValue = entry.getValue();
-
-            if (actual(tmValue)) {
-                result = false;
-                break;
-            } else {
-                it.remove();
-            }
-        }
-
-        return result;
+        return size() == 0;
     }
 
     @Override
@@ -130,9 +123,8 @@ public class CacheMapImpl<K, V> implements CacheMap<K, V> {
 
     @Override
     public int size() {
-        return (int) storage.values().stream()
-                .filter(this::actual)
-                .count();
+        clearExpired();
+        return storage.size();
     }
 
     private static class TimedValue<V> {
